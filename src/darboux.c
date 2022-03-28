@@ -19,6 +19,7 @@
 float max_terrain(const mnt *restrict m)
 {
     float max = m->terrain[0];
+    #pragma omp parallel for
     for (int i = 0; i < m->ncols * m->nrows; i++)
         if (m->terrain[i] > max)
             max = m->terrain[i];
@@ -33,10 +34,12 @@ float *init_W(const mnt *restrict m)
     CHECK((W = malloc(ncols * nrows * sizeof(float))) != NULL);
 
     // initialisation W
+    int j;
     const float max = max_terrain(m) + 10.;
+    #pragma omp parallel for private(j)
     for (int i = 0; i < nrows; i++)
     {
-        for (int j = 0; j < ncols; j++)
+        for (j = 0; j < ncols; j++)
         {
             if (i == 0 || i == nrows - 1 || j == 0 || j == ncols - 1 ||
                 TERRAIN(m, i, j) == m->no_data)
