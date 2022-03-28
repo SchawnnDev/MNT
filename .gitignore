@@ -68,7 +68,6 @@ tests/
 
 # CMake
 cmake-build-debug/
-CMakeLists.txt
 
 # idea
 .idea/
