@@ -28,7 +28,7 @@ OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 $(BIN_DIR)/$(EXECUTABLE_NAME) : title tips build_dir $(OBJS)
 	@echo "\n> Compiling : "
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(OBJS) -o $@
+	$(CC) $(OBJS) -fopenmp -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
