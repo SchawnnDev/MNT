@@ -1,10 +1,21 @@
 # Directories
 
 SRC_DIR = src
-IPT_DIR = input
 OBJ_DIR = obj
 BIN_DIR = bin
+OPT_DIR = output
+IPT_DIR = input
+SH_DIR = scripts
 ARCH_DIR = dist
+
+# Files
+
+MIN_FL = mini
+SML_FL = small
+MED_FL = medium
+LRG_FL = large
+FL_EXT = .mnt
+CMP_SH = compare.sh
 
 # Program
 
@@ -35,22 +46,39 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 
 # Run
 
-run: title tips
+run: title tips build_opt
 	@./bin/$(EXECUTABLE_NAME)
 
-mini: title tips
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/mini.mnt
+mini: title tips build_opt
+	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(MIN_FL)$(FL_EXT) $(OPT_DIR)/$(MIN_FL)$(FL_EXT)
+	@echo "\n> Calling script :"
+	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(MIN_FL)$(FL_EXT) $(OPT_DIR)/$(MIN_FL)$(FL_EXT)
 
-small: title tips
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/small.mnt
 
-medium: title tips
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/medium.mnt
+small: title tips build_opt
+	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(SML_FL)$(FL_EXT) $(OPT_DIR)/$(SML_FL)$(FL_EXT)
+	@echo "\n> Calling script :"
+	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(SML_FL)$(FL_EXT) $(OPT_DIR)/$(SML_FL)$(FL_EXT)
 
-large: title tips
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/large.mnt
+
+medium: title tips build_opt
+	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(MED_FL)$(FL_EXT) $(OPT_DIR)/$(MED_FL)$(FL_EXT)
+	@echo "\n> Calling script :"
+	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(MED_FL)$(FL_EXT) $(OPT_DIR)/$(MED_FL)$(FL_EXT)
+
+
+large: title tips build_opt
+	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(LRG_FL)$(FL_EXT) $(OPT_DIR)/$(LRG_FL)$(FL_EXT)
+	@echo "\n> Calling script :"
+	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(LRG_FL)$(FL_EXT) $(OPT_DIR)/$(LRG_FL)$(FL_EXT)
+
 
 # Utils
+
+build_opt:
+	@echo "> Building the output directory :"
+	mkdir -p $(OPT_DIR)
+	@echo "> Output file is :"
 
 build_dir:
 	@$(call make-obj)
@@ -60,11 +88,12 @@ clean:
 	rm -rf $(OBJ_DIR)
 	rm -rf $(BIN_DIR)
 	rm -rf $(ARCH_DIR)
+	rm -rf $(OPT_DIR)
 
 dist: clean
 	@mkdir -p $(ARCH_DIR)
 	@echo "> Archiving :"
-	tar -czvf $(ARCH_DIR)/MNT-Projet_PP.tar.gz Makefile README.md $(SRC_DIR)
+	tar -czvf $(ARCH_DIR)/MNT-Projet_PP.tar.gz Makefile README.md $(SRC_DIR) $(SH_DIR)
 
 # Functions
 
