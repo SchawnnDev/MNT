@@ -1,6 +1,7 @@
 // fonction de calcul principale : algorithme de Darboux
 // (remplissage des cuvettes d'un MNT)
 #include <string.h>
+#include <mpi.h>
 
 #include "check.h"
 #include "type.h"
@@ -19,7 +20,7 @@
 float max_terrain(const mnt *restrict m)
 {
     float max = m->terrain[0];
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int i = 0; i < m->ncols * m->nrows; i++)
         if (m->terrain[i] > max)
             max = m->terrain[i];
@@ -36,7 +37,7 @@ float *init_W(const mnt *restrict m)
     // initialisation W
     int j;
     const float max = max_terrain(m) + 10.;
-    #pragma omp parallel for private(j)
+#pragma omp parallel for private(j)
     for (int i = 0; i < nrows; i++)
     {
         for (j = 0; j < ncols; j++)
@@ -155,10 +156,123 @@ mnt *darboux(const mnt *restrict m)
     Wprec = init_W(m);
 
     // calcul : boucle principale
-    int modif = 1;
-    while (modif)
+    int modif, running = 1;
+    while (running)
     {
+        // Va faire un || sur toutes les valeurs modif, si toutes les valeurs sont 0 alors le programme est terminé
+        MPI_Reduce(&modif, &running, 1, MPI_INT,
+                   MPI_LOR, 0, MPI_COMM_WORLD);
+        // Donc si running == 0, alors le programme sera terminé
+
+        // MPI_Bcast(&running, 1, MPI_INT, 0, MPI_COMM_WORLD);
         modif = 0; // sera mis à 1 s'il y a une modification
+
+
+        if (running)
+        {
+
+            // Host
+            if (rank == 0)
+            {
+                // On envoie Wprec au processus suivant
+                MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
+                         MPI_FLOAT, rank + 1,
+                         0, MPI_COMM_WORLD);
+
+                // Ici on calcule jusqu'à l'avant derniere ligne
+                // Pour gagner du temps entre le send & le recv
+                for (int i = 0; i < nrows - 2; i++)
+                {
+                    for (int j = 0; j < ncols; j++)
+                    {
+                        // calcule la nouvelle valeur de W[i,j]
+                        // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
+                        modif |= calcul_Wij(W, Wprec, m, i, j);
+                    }
+                }
+
+                MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
+                         MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+
+                // Ici on traite la derniere ligne
+                for (int j = 0; j < ncols; ++j)
+                {
+                    modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
+                }
+
+            } else if (rank == size - 1)
+            { // Dernier process
+
+                // Envoie la première ligne du processus actuel au processus précédent
+                MPI_Send(&Wprec[1 * ncols], ncols,
+                         MPI_FLOAT, rank - 1,
+                         0, MPI_COMM_WORLD);
+
+                // Attend de recevoir la ligne précédente du processus précédent
+                MPI_Recv(&Wprec[0], ncols,
+                         MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+
+                // Ici on calcule jusqu'à l'avant derniere ligne
+                for (int i = 1; i < nrows - 1; i++)
+                {
+                    for (int j = 0; j < ncols; j++)
+                    {
+                        // calcule la nouvelle valeur de W[i,j]
+                        // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
+                        modif |= calcul_Wij(W, Wprec, m, i, j);
+                    }
+                }
+
+            } else
+            { // Tous les autres
+
+                // Envoie la première ligne du processus actuel au processus précédent
+                MPI_Send(&Wprec[1 * ncols], ncols,
+                         MPI_FLOAT, rank - 1,
+                         0, MPI_COMM_WORLD);
+
+                // Envoie la dernière ligne du processus actuel au processus suivant
+                MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
+                         MPI_FLOAT, rank + 1,
+                         0, MPI_COMM_WORLD);
+
+                // Attend de recevoir la ligne précédente du processus précédent
+                MPI_Recv(&Wprec[0], ncols,
+                         MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+
+                // Ici on calcule jusqu'à l'avant derniere ligne
+                // Pour gagner du temps entre le send & le recv
+                for (int i = 1; i < nrows - 2; i++)
+                {
+                    for (int j = 0; j < ncols; j++)
+                    {
+                        // calcule la nouvelle valeur de W[i,j]
+                        // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
+                        modif |= calcul_Wij(W, Wprec, m, i, j);
+                    }
+                }
+
+                // Attend de recevoir la première ligne du processus suivant
+                MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
+                         MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+
+                // Ici on traite la derniere ligne
+                for (int j = 0; j < ncols; ++j)
+                {
+                    modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
+                }
+            }
+
+        } else
+        {
+            // End
+
+        }
+
 
         // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
         for (int i = 0; i < nrows; i++)

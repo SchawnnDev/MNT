@@ -25,6 +25,7 @@ mnt *mnt_read(char *fname)
 
   CHECK((m->terrain = malloc(m->ncols * m->nrows * sizeof(float))) != NULL);
 
+#pragma omp parallel for
   for(int i = 0 ; i < m->ncols * m->nrows ; i++)
   {
     CHECK(fscanf(f, "%f", &m->terrain[i]) == 1);
