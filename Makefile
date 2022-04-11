@@ -5,7 +5,6 @@ OBJ_DIR = obj
 BIN_DIR = bin
 OPT_DIR = output
 IPT_DIR = input
-SH_DIR = scripts
 ARCH_DIR = dist
 
 # Files
@@ -15,7 +14,6 @@ SML_FL = small
 MED_FL = medium
 LRG_FL = large
 FL_EXT = .mnt
-CMP_SH = compare.sh
 
 # Program
 
@@ -51,26 +49,15 @@ run: title tips build_opt
 
 mini: title tips build_opt
 	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(MIN_FL)$(FL_EXT) $(OPT_DIR)/$(MIN_FL)$(FL_EXT)
-	@echo "\n> Calling script :"
-	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(MIN_FL)$(FL_EXT) $(OPT_DIR)/$(MIN_FL)$(FL_EXT)
-
 
 small: title tips build_opt
 	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(SML_FL)$(FL_EXT) $(OPT_DIR)/$(SML_FL)$(FL_EXT)
-	@echo "\n> Calling script :"
-	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(SML_FL)$(FL_EXT) $(OPT_DIR)/$(SML_FL)$(FL_EXT)
-
 
 medium: title tips build_opt
 	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(MED_FL)$(FL_EXT) $(OPT_DIR)/$(MED_FL)$(FL_EXT)
-	@echo "\n> Calling script :"
-	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(MED_FL)$(FL_EXT) $(OPT_DIR)/$(MED_FL)$(FL_EXT)
-
 
 large: title tips build_opt
 	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(LRG_FL)$(FL_EXT) $(OPT_DIR)/$(LRG_FL)$(FL_EXT)
-	@echo "\n> Calling script :"
-	./$(SH_DIR)/$(CMP_SH) $(IPT_DIR)/$(LRG_FL)$(FL_EXT) $(OPT_DIR)/$(LRG_FL)$(FL_EXT)
 
 
 # Utils
@@ -93,7 +80,7 @@ clean:
 dist: clean
 	@mkdir -p $(ARCH_DIR)
 	@echo "> Archiving :"
-	tar -czvf $(ARCH_DIR)/MNT-Projet_PP.tar.gz Makefile README.md $(SRC_DIR) $(SH_DIR)
+	tar -czvf $(ARCH_DIR)/MNT-Projet_PP.tar.gz Makefile README.md $(SRC_DIR)
 
 # Functions
 
