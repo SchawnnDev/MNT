@@ -79,6 +79,11 @@ float *terrain;                     // linear array (size: ncols*nrows)
             fclose(out);
         else
             mnt_write_lakes(m, d, stdout);
+
+        // SYNC COMPUTE
+        mnt *expected;
+        expected = darboux(m);
+        mnt_compare(expected, d);
     }
 
 

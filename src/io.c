@@ -69,3 +69,67 @@ void mnt_write_lakes(mnt *m, mnt *d, FILE *f)
     fprintf(f, "\n");
   }
 }
+
+void mnt_compare(mnt* expected, mnt* result)
+{
+    if(expected->ncols != result->ncols)
+    {
+        fprintf(stderr, "BAD RESULTS !");
+        fprintf(stderr, " (result->ncols = %d should be %d)\n",
+                result->ncols, expected->ncols);
+        return;
+    }
+    else if(expected->nrows != result->nrows)
+    {
+        fprintf(stderr, "BAD RESULTS !");
+        fprintf(stderr, " (result->nrows = %d should be %d)\n",
+                result->nrows, expected->nrows);
+        return;
+    }
+    else if(expected->xllcorner != result->xllcorner)
+    {
+        fprintf(stderr, "BAD RESULTS !");
+        fprintf(stderr, " (result->xllcorner = %g should be %g)\n",
+                result->xllcorner, expected->xllcorner);
+        return;
+    }
+    else if(expected->yllcorner != result->yllcorner)
+    {
+        fprintf(stderr, "BAD RESULTS !");
+        fprintf(stderr, " (result->yllcorner = %g should be %g)\n",
+                result->yllcorner, expected->yllcorner);
+        return;
+    }
+    else if(expected->cellsize != result->cellsize)
+    {
+        fprintf(stderr, "BAD RESULTS !");
+        fprintf(stderr, " (result->cellsize = %g should be %g)\n",
+                result->cellsize, expected->cellsize);
+        return;
+    }
+    else if(expected->no_data != result->no_data)
+    {
+        fprintf(stderr, "BAD RESULTS !");
+        fprintf(stderr, " (result->no_data = %g should be %g)\n",
+                result->no_data, expected->no_data);
+        return;
+    }
+    else{
+        for(int i = 0 ; i < expected->nrows ; i++)
+        {
+            for(int j = 0 ; j < expected->ncols ; j++)
+            {
+                const float exp = TERRAIN(expected,i,j);
+                const float res = TERRAIN(expected,i,j);
+                const float dif = exp-res;
+                if(dif != 0) {
+                    fprintf(stderr, "BAD RESULTS !");
+                    fprintf(stderr, " (result[%d][%d] = %g should be %g)\n",
+                            i, j, exp, res);
+                    return;
+                }
+            }
+        }
+    }
+    fprintf(stderr, "Ok results :)\n");
+}
