@@ -71,9 +71,8 @@ float *terrain;                     // linear array (size: ncols*nrows)
               NULL);
     }
 
-    printf("[%d] Before MPI_Bcast\n", rank);
-
     // broadcast m
+    printf("[%d] Before MPI_Bcast\n", rank);
     MPI_Bcast(m, 1, mpi_mnt_type, 0, MPI_COMM_WORLD);
 
     // Init array and set nrows for each process
@@ -81,16 +80,27 @@ float *terrain;                     // linear array (size: ncols*nrows)
     for(size_t i=0; i<size; i++)
         rowsPerProc[i] = m->nrows / size;
 
-    // Distribute the remaining rows to the first processes
-    int remainingRows = (rowsPerProc[0] * size) - m->nrows;
+    // Check if there is more processes than mat rows
+    // TODO : check if a process had 0 as nrows value
+    if(size > m->nrows)
+        for (size_t i = size - m->nrows; i < size; i++)
+            rowsPerProc[i] = 0;
+
+    // Distribute the remaining rows to the first processes in line
+    int remainingRows = m->nrows % size;
     if(rank == 0 && remainingRows > 0)
-        for(size_t i=0; remainingRows < 0; i++, remainingRows--)
+        for(size_t i=0; remainingRows > 0; i++, remainingRows--)
             rowsPerProc[i]++;
 
     for(size_t i=0; i < size; i++)
         printf("%d - ", rowsPerProc[i]);
 
-    printf("[%d] ncols=%d, nrows=%d, no_data=%f\n", rank, m->ncols,
+    // Displacement array
+    int* displ = malloc(size*sizeof(int));
+    for(size_t i=0; i<size; i++)
+        displ[i] = i * rowsPerProc[i];
+
+    printf("[%d]/%d ncols=%d, nrows=%d, no_data=%f\n", rank, size, m->ncols,
            m->nrows, m->no_data);
 
     if (rank != 0)
@@ -115,8 +125,13 @@ float *terrain;                     // linear array (size: ncols*nrows)
     printf("[%d] Before darboux compute\n", rank);
 
     //const int t_size = m->ncols * m->nrows;
-    /* MPI_Scatter(m->terrain, rowsPerProc, MPI_FLOAT,
-                m->terrain, rowsPerProc, MPI_FLOAT,
+
+    int recvcount = 0;
+    MPI_Scatterv(m->terrain, rowsPerProc, displ, MPI_FLOAT, m->terrain,
+                 recvcount, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    /*MPI_Scatter(m->terrain, rowsPerProc, MPI_FLOAT,
+                m->terrain, recvcount, MPI_FLOAT,
                 0, MPI_COMM_WORLD);
 
     printf("print %d\n", rowsPerProc);
@@ -151,6 +166,7 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
 
     // free
+    //free(rowsPerProc);
     free(m->terrain);
     free(m);
     free(d->terrain);
