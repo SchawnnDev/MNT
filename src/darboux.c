@@ -104,6 +104,8 @@ int calcul_Wij(float *restrict W, const float *restrict Wprec, const mnt *m,
             const int n1 = i + VOISINS[v][0];
             const int n2 = j + VOISINS[v][1];
 
+            // printf("[%d] - (%d %d) (%d %d)\n", rank, n1, n2, nrows, ncols);
+
             // vérifie qu'on ne sort pas de la grille.
             // ceci est théoriquement impossible, si les bords de la matrice Wprec
             // sont bien initialisés avec les valeurs des bords du mnt
@@ -159,6 +161,7 @@ mnt *darboux(const mnt *restrict m)
     int modif, running = 1;
     while (running)
     {
+
         // Va faire un || sur toutes les valeurs modif, si toutes les valeurs sont 0 alors le programme est terminé
         MPI_Reduce(&modif, &running, 1, MPI_INT,
                    MPI_LOR, 0, MPI_COMM_WORLD);
@@ -171,9 +174,14 @@ mnt *darboux(const mnt *restrict m)
         if (running)
         {
 
+            // printf("[%d] is running\n", rank);
+
             // Host
             if (rank == 0)
             {
+
+                //printf("[%d] is sending to [%d]\n", rank, rank + 1);
+
                 // On envoie Wprec au processus suivant
                 MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
                          MPI_FLOAT, rank + 1,
@@ -191,6 +199,8 @@ mnt *darboux(const mnt *restrict m)
                     }
                 }
 
+                //printf("[%d] is receiving from [%d]\n", rank, rank + 1);
+
                 MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
                          MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
                          MPI_STATUS_IGNORE);
@@ -201,13 +211,18 @@ mnt *darboux(const mnt *restrict m)
                     modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
                 }
 
-            } else if (rank == size - 1)
+            }
+            else if (rank == size - 1)
             { // Dernier process
+
+                //printf("[%d] is sending to [%d]\n", rank, rank - 1);
 
                 // Envoie la première ligne du processus actuel au processus précédent
                 MPI_Send(&Wprec[1 * ncols], ncols,
                          MPI_FLOAT, rank - 1,
                          0, MPI_COMM_WORLD);
+
+                //printf("[%d] is receiving from [%d]\n", rank, rank - 1);
 
                 // Attend de recevoir la ligne précédente du processus précédent
                 MPI_Recv(&Wprec[0], ncols,
@@ -225,18 +240,25 @@ mnt *darboux(const mnt *restrict m)
                     }
                 }
 
-            } else
+            }
+            else
             { // Tous les autres
+
+                //printf("[%d] is sending to [%d]\n", rank, rank - 1);
 
                 // Envoie la première ligne du processus actuel au processus précédent
                 MPI_Send(&Wprec[1 * ncols], ncols,
                          MPI_FLOAT, rank - 1,
                          0, MPI_COMM_WORLD);
 
+                //printf("[%d] is sending to [%d]\n", rank, rank + 1);
+
                 // Envoie la dernière ligne du processus actuel au processus suivant
                 MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
                          MPI_FLOAT, rank + 1,
                          0, MPI_COMM_WORLD);
+
+                //printf("[%d] is receiving from [%d]\n", rank, rank - 1);
 
                 // Attend de recevoir la ligne précédente du processus précédent
                 MPI_Recv(&Wprec[0], ncols,
@@ -254,6 +276,8 @@ mnt *darboux(const mnt *restrict m)
                         modif |= calcul_Wij(W, Wprec, m, i, j);
                     }
                 }
+
+                //printf("[%d] is receiving from [%d]\n", rank, rank + 1);
 
                 // Attend de recevoir la première ligne du processus suivant
                 MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,

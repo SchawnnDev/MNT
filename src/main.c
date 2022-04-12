@@ -43,9 +43,9 @@ void calculate_counts(mnt *m, int *rowsPerProc, int *displ)
 
     // Distribute the remaining rows to the first processes in line
     int remainingRows = m->nrows % size;
-    if (rank == 0 && remainingRows > 0)
-        for (size_t i = 0; remainingRows > 0; i++, remainingRows--)
-            rowsPerProc[i]++;
+
+    for (size_t i = 0; remainingRows > 0; i++, remainingRows--)
+        rowsPerProc[i]++;
 
     // Displacement array
 
@@ -97,17 +97,18 @@ float *terrain;                     // linear array (size: ncols*nrows)
     offsets[1] = offsetof(mnt, nrows);
     offsets[2] = offsetof(mnt, no_data);
 
-    printf("[%d] Before MPI_Type_create_struct\n", rank);
+    //printf("[%d] Before MPI_Type_create_struct\n", rank);
 
     MPI_Type_create_struct(mnt_var_count, blocklengths,
                            offsets, mnt_datatypes,
                            &mpi_mnt_type);
-    printf("[%d] Before MPI_Type_commit\n", rank);
+    //printf("[%d] Before MPI_Type_commit\n", rank);
     MPI_Type_commit(&mpi_mnt_type);
 
     // READ INPUT ONLY IN PROCESS 0
     if (rank == 0)
     {
+        printf("Size = %d\n", size);
         m = mnt_read(argv[1]);
     } else
     {
@@ -128,9 +129,9 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
     calculate_counts(m, rowsPerProc, displ);
 
-    printf("[%d]/%d ncols=%d, nrows=%d, no_data=%f, send_count=%d\n",
+    /*printf("[%d]/%d ncols=%d, nrows=%d, no_data=%f, send_count=%d\n",
            rank, size, m->ncols,
-           m->nrows, m->no_data, rowsPerProc[rank]);
+           m->nrows, m->no_data, rowsPerProc[rank]);*/
 
     m->nrows = (rowsPerProc[rank] / m->ncols) + 1;
     int startIdx = (rank == 0) ? 0 : m->ncols;
@@ -151,21 +152,29 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
     }
 
-    print_debug(m);
+     // print_debug(m);
 
     MPI_Scatterv(m->terrain, rowsPerProc, displ,
                  MPI_FLOAT, &(m->terrain[startIdx]),
                  rowsPerProc[rank] * m->ncols,
                  MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    printf("[%d] Before print_debug\n", rank);
+    //printf("[%d] Before print_debug\n", rank);
 
-    print_debug(m);
+    // print_debug(m);
 
-    printf("[%d] Before darboux compute\n", rank);
+    //printf("[%d] Before darboux compute\n", rank);
 
     // COMPUTE
     d = darboux(m);
+
+    mnt *m_new = mnt_read(argv[1]);
+    MPI_Gatherv(&(m->terrain[startIdx]), rowsPerProc[rank] * m->ncols, MPI_FLOAT,
+                m_new,rowsPerProc, displ, MPI_FLOAT,
+                0, MPI_COMM_WORLD);
+
+    if(rank == 0)
+        print_debug(m_new);
 
     printf("[%d] Before write\n", rank);
 
