@@ -171,6 +171,20 @@ mnt *darboux(const mnt *restrict m)
         if (running)
         {
 
+            // 1 process = main process
+            if (size == 1)
+            {
+                // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
+                for (int i = 0; i < nrows; i++)
+                {
+                    for (int j = 0; j < ncols; j++)
+                    {
+                        // calcule la nouvelle valeur de W[i,j]
+                        // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
+                        modif |= calcul_Wij(W, Wprec, m, i, j);
+                    }
+                }
+            } else
             // Host
             if (rank == 0)
             {
@@ -271,18 +285,6 @@ mnt *darboux(const mnt *restrict m)
         {
             // End
 
-        }
-
-
-        // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
-        for (int i = 0; i < nrows; i++)
-        {
-            for (int j = 0; j < ncols; j++)
-            {
-                // calcule la nouvelle valeur de W[i,j]
-                // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                modif |= calcul_Wij(W, Wprec, m, i, j);
-            }
         }
 
 #ifdef DARBOUX_PPRINT

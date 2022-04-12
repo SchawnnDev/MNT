@@ -10,18 +10,18 @@
 
 int rank, size; // External ints
 
-void print_debug(mnt *m)
+void print_debug(mnt *m, char* prout)
 {
-    fprintf(stdout, "[%d] %d\n", rank, m->ncols);
-    fprintf(stdout, "[%d] %d\n", rank, m->nrows);
-    fprintf(stdout, "[%d] %.2f\n", rank, m->xllcorner);
-    fprintf(stdout, "[%d] %.2f\n", rank, m->yllcorner);
-    fprintf(stdout, "[%d] %.2f\n", rank, m->cellsize);
-    fprintf(stdout, "[%d] %.2f\n", rank, m->no_data);
+    fprintf(stdout, "%s[%d] %d\n",prout, rank, m->ncols);
+    fprintf(stdout, "%s[%d] %d\n",prout, rank, m->nrows);
+    fprintf(stdout, "%s[%d] %.2f\n", prout, rank, m->xllcorner);
+    fprintf(stdout, "%s[%d] %.2f\n", prout, rank, m->yllcorner);
+    fprintf(stdout, "%s[%d] %.2f\n", prout, rank, m->cellsize);
+    fprintf(stdout, "%s[%d] %.2f\n", prout, rank, m->no_data);
 
     for (int i = 0; i < m->nrows; i++)
     {
-        fprintf(stdout, "[%d] ", rank);
+        fprintf(stdout, "%s[%d] ", prout,rank);
         for (int j = 0; j < m->ncols; j++)
         {
             fprintf(stdout, "%.2f ", TERRAIN(m, i, j));
@@ -132,7 +132,8 @@ float *terrain;                     // linear array (size: ncols*nrows)
            rank, size, m->ncols,
            m->nrows, m->no_data, rowsPerProc[rank]);
 
-    m->nrows = (rowsPerProc[rank] / m->ncols) + 1;
+    m->nrows = (rowsPerProc[rank] / m->ncols);
+
     int startIdx = (rank == 0) ? 0 : m->ncols;
 
     if (rank != 0)
@@ -151,24 +152,33 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
     }
 
-    print_debug(m);
+    print_debug(m, "1");
 
-    MPI_Scatterv(m->terrain, rowsPerProc, displ,
-                 MPI_FLOAT, &(m->terrain[startIdx]),
+    MPI_Scatterv(&(m->terrain[startIdx]), rowsPerProc, displ,
+                 MPI_FLOAT, m->terrain,
                  rowsPerProc[rank] * m->ncols,
                  MPI_FLOAT, 0, MPI_COMM_WORLD);
 
+    print_debug(m, "2");
+
     printf("[%d] Before print_debug\n", rank);
 
-    print_debug(m);
+    print_debug(m, "3");
 
     printf("[%d] Before darboux compute\n", rank);
 
     // COMPUTE
     d = darboux(m);
 
-    printf("[%d] Before write\n", rank);
+    MPI_Gatherv(&(m->terrain[startIdx]),
+                rowsPerProc[rank] * m->ncols,
+                MPI_FLOAT, m->terrain,
+                rowsPerProc, displ,
+                MPI_FLOAT, 0, MPI_COMM_WORLD);
 
+    print_debug(m, "3");
+
+    printf("[%d] Before write\n", rank);
     // WRITE OUTPUT ONLY IN PROCESS 0
     if (rank == 0)
     {
