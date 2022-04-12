@@ -10,6 +10,56 @@
 
 int rank, size; // External ints
 
+void print_debug(mnt *m)
+{
+    fprintf(stdout, "[%d] %d\n", rank, m->ncols);
+    fprintf(stdout, "[%d] %d\n", rank, m->nrows);
+    fprintf(stdout, "[%d] %.2f\n", rank, m->xllcorner);
+    fprintf(stdout, "[%d] %.2f\n", rank, m->yllcorner);
+    fprintf(stdout, "[%d] %.2f\n", rank, m->cellsize);
+    fprintf(stdout, "[%d] %.2f\n", rank, m->no_data);
+
+    for (int i = 0; i < m->nrows; i++)
+    {
+        fprintf(stdout, "[%d] ", rank);
+        for (int j = 0; j < m->ncols; j++)
+        {
+            fprintf(stdout, "%.2f ", TERRAIN(m, i, j));
+        }
+        fprintf(stdout, "\n");
+    }
+}
+
+void calculate_counts(mnt *m, int *rowsPerProc, int *displ)
+{
+    for (size_t i = 0; i < size; i++)
+        rowsPerProc[i] = m->nrows / size;
+
+    // Check if there is more processes than mat rows
+    // TODO : check if a process had 0 as nrows value
+    if (size > m->nrows)
+        for (size_t i = size - m->nrows; i < size; i++)
+            rowsPerProc[i] = 0;
+
+    // Distribute the remaining rows to the first processes in line
+    int remainingRows = m->nrows % size;
+    if (rank == 0 && remainingRows > 0)
+        for (size_t i = 0; remainingRows > 0; i++, remainingRows--)
+            rowsPerProc[i]++;
+
+    // Displacement array
+
+    int sum = 0;
+
+    for (size_t i = 0; i < size; i++)
+    {
+        // Elements * cols
+        rowsPerProc[i] *= m->ncols;
+        displ[i] = sum;
+        sum += rowsPerProc[i];
+    }
+}
+
 int main(int argc, char **argv)
 {
     mnt *m, *d;
@@ -67,77 +117,52 @@ float *terrain;                     // linear array (size: ncols*nrows)
         m->yllcorner = 0;
         m->cellsize = 0;
         m->no_data = 0;
-        CHECK((m->terrain = malloc(m->ncols * m->nrows * sizeof(float))) !=
-              NULL);
     }
 
     // broadcast m
-    printf("[%d] Before MPI_Bcast\n", rank);
     MPI_Bcast(m, 1, mpi_mnt_type, 0, MPI_COMM_WORLD);
 
     // Init array and set nrows for each process
-    int *rowsPerProc = malloc(size*sizeof(int));
-    for(size_t i=0; i<size; i++)
-        rowsPerProc[i] = m->nrows / size;
+    int *rowsPerProc = malloc(size * sizeof(int));
+    int *displ = malloc(size * sizeof(int));
 
-    // Check if there is more processes than mat rows
-    // TODO : check if a process had 0 as nrows value
-    if(size > m->nrows)
-        for (size_t i = size - m->nrows; i < size; i++)
-            rowsPerProc[i] = 0;
+    calculate_counts(m, rowsPerProc, displ);
 
-    // Distribute the remaining rows to the first processes in line
-    int remainingRows = m->nrows % size;
-    if(rank == 0 && remainingRows > 0)
-        for(size_t i=0; remainingRows > 0; i++, remainingRows--)
-            rowsPerProc[i]++;
+    printf("[%d]/%d ncols=%d, nrows=%d, no_data=%f, send_count=%d\n",
+           rank, size, m->ncols,
+           m->nrows, m->no_data, rowsPerProc[rank]);
 
-    for(size_t i=0; i < size; i++)
-        printf("%d - ", rowsPerProc[i]);
-
-    // Displacement array
-    int* displ = malloc(size*sizeof(int));
-    for(size_t i=0; i<size; i++)
-        displ[i] = i * rowsPerProc[i];
-
-    printf("[%d]/%d ncols=%d, nrows=%d, no_data=%f\n", rank, size, m->ncols,
-           m->nrows, m->no_data);
+    m->nrows = (rowsPerProc[rank] / m->ncols) + 1;
+    int startIdx = (rank == 0) ? 0 : m->ncols;
 
     if (rank != 0)
     {
-        fprintf(stdout, "[%d] %d\n", rank, m->ncols);
-        fprintf(stdout, "[%d] %d\n", rank, m->nrows);
-        fprintf(stdout, "[%d] %.2f\n", rank, m->xllcorner);
-        fprintf(stdout, "[%d] %.2f\n", rank, m->yllcorner);
-        fprintf(stdout, "[%d] %.2f\n", rank, m->cellsize);
-        fprintf(stdout, "[%d] %.2f\n", rank, m->no_data);
+        // Processes in the middle should have 2 rows
+        if (rank != size - 1)
+            m->nrows += 1;
 
-        for (int i = 0; i < m->nrows; i++)
-        {
-            fprintf(stdout, "[%d] ", rank);
-            for (int j = 0; j < m->ncols; j++)
-            {
-                fprintf(stdout, "%.2f ", TERRAIN(m, i, j));
-            }
-            fprintf(stdout, "\n");
-        }
+        CHECK((m->terrain = malloc(m->ncols * m->nrows * sizeof(float))) !=
+              NULL);
+
+        // Init table terrain with 0
+        for (int i = 0; i < m->nrows; ++i)
+            for (int j = 0; j < m->ncols; ++j)
+                TERRAIN(m, i, j) = 0;
+
     }
+
+    print_debug(m);
+
+    MPI_Scatterv(m->terrain, rowsPerProc, displ,
+                 MPI_FLOAT, &(m->terrain[startIdx]),
+                 rowsPerProc[rank] * m->ncols,
+                 MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    printf("[%d] Before print_debug\n", rank);
+
+    print_debug(m);
+
     printf("[%d] Before darboux compute\n", rank);
-
-    //const int t_size = m->ncols * m->nrows;
-
-    int recvcount = 0;
-    MPI_Scatterv(m->terrain, rowsPerProc, displ, MPI_FLOAT, m->terrain,
-                 recvcount, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-    /*MPI_Scatter(m->terrain, rowsPerProc, MPI_FLOAT,
-                m->terrain, recvcount, MPI_FLOAT,
-                0, MPI_COMM_WORLD);
-
-    printf("print %d\n", rowsPerProc);
-
-    // On change pour le process 0
-    m->nrows = rowsPerProc;*/
 
     // COMPUTE
     d = darboux(m);
@@ -166,7 +191,8 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
 
     // free
-    //free(rowsPerProc);
+    free(rowsPerProc);
+    free(displ);
     free(m->terrain);
     free(m);
     free(d->terrain);
