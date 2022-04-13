@@ -146,35 +146,27 @@ int main(int argc, char **argv)
                  rowsPerProc[rank] * m->ncols,
                  MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    printf("[%d] After scatter\n", rank);
-    print_debug(m, "1");
+    // Value after scatter
+    print_debug(m, "S");
 
     // COMPUTE
     d = darboux(m);
 
-    printf("[%d] After darboux\n", rank);
-    print_debug(m, "2");
+    // Value after darboux
+    print_debug(m, "D");
 
-/*    if(rank == 0)
-        for(int i=0; i<size; i++)
-            printf("[0]         => %d\n", rowsPerProc[i]);
-    printf("[%d] = %d * %d = %d\n", rank, rowsPerProc[rank], m->ncols, rowsPerProc[rank] * m->ncols);*/
-
-    MPI_Gatherv(&(m->terrain[startIdx]),
+    MPI_Gatherv(&(d->terrain[startIdx]),
                 rowsPerProc[rank],
                 MPI_FLOAT, r->terrain,
                 rowsPerProc, displ,
                 MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    if(rank == 0)
-    {
-        printf("[%d] Result\n", rank);
-        print_debug(m, "R");
-    }
-
     // WRITE OUTPUT ONLY IN PROCESS 0
     if (rank == 0)
     {
+        // Value after gather
+        print_debug(r, "R");
+
         FILE *out;
         if (argc == 3)
             out = fopen(argv[2], "w");
@@ -187,23 +179,21 @@ int main(int argc, char **argv)
             mnt_write_lakes(m, r, stdout);
 
         // SYNC COMPUTE
-        mnt *expected;
-        expected = darboux_seq(m);
+        mnt *expected = darboux_seq( mnt_read(argv[1]));
+        // Value expected
+        print_debug(expected, "E");
         mnt_compare(expected, r);
     }
 
     // free
-    if(rank == 0)
-    {
-        free(r->terrain);
-        free(r);
-    }
     free(rowsPerProc);
     free(displ);
     free(m->terrain);
     free(m);
     free(d->terrain);
     free(d);
+    free(r->terrain);
+    free(r);
 
     // Finalize
     MPI_Finalize();
