@@ -2,11 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <omp.h>
+#include <string.h>
 
 #include "type.h"
 #include "io.h"
 #include "darboux.h"
 #include "check.h"
+
+#define HYPERTHREADING 1 // 1 if hyperthreading is on, 0 otherwise
 
 int rank, size; // External ints
 
@@ -59,7 +63,8 @@ void calculate_counts(mnt *m, int *rowsPerProc, int *displ)
 
 int main(int argc, char **argv)
 {
-    mnt *m, *d, *r;
+    mnt *m, *d, *r, *e;
+    double time_reference, time_kernel = 0, speedup, efficiency;
 
     if (argc < 2)
     {
@@ -90,6 +95,11 @@ int main(int argc, char **argv)
     {
         printf("Size = %d\n", size);
         m = mnt_read(argv[1]);
+
+        CHECK((e = malloc(sizeof(*e))) != NULL);
+        memcpy(e, m, sizeof(*e));
+
+        time_kernel = omp_get_wtime() ;
     }
     else
     {
@@ -164,6 +174,8 @@ int main(int argc, char **argv)
     // WRITE OUTPUT ONLY IN PROCESS 0
     if (rank == 0)
     {
+        time_kernel = omp_get_wtime() - time_kernel ;
+
         // Value after gather
         // print_debug(r, "R");
 
@@ -179,7 +191,17 @@ int main(int argc, char **argv)
             mnt_write_lakes(m, r, stdout);
 
         // SYNC COMPUTE
-        mnt *expected = darboux_seq( mnt_read(argv[1]));
+        time_reference = omp_get_wtime();
+        mnt *expected = darboux_seq(e);
+        time_reference  = omp_get_wtime() - time_reference ;
+
+        speedup = time_reference / time_kernel;
+        efficiency = speedup / (omp_get_num_procs() / (1 + HYPERTHREADING));
+        printf("Reference time : %3.5lf s\n", time_reference);
+        printf("Kernel time    : %3.5lf s\n", time_kernel);
+        printf("Speedup ------ : %3.5lf\n", speedup);
+        printf("Efficiency --- : %3.5lf\n", efficiency);
+
         // Value expected
         // print_debug(expected, "E");
         mnt_compare(expected, r);
