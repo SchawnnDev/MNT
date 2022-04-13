@@ -166,23 +166,21 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
     print_debug(m, "3");
 
-    //printf("[%d] Before darboux compute\n", rank);
+    printf("[%d] Before darboux compute\n", rank);
 
     // COMPUTE
     d = darboux(m);
 
+/*    if(rank == 0)
+        for(int i=0; i<size; i++)
+            printf("[0]         => %d\n", rowsPerProc[i]);
+    printf("[%d] = %d * %d = %d\n", rank, rowsPerProc[rank], m->ncols, rowsPerProc[rank] * m->ncols);*/
+
     MPI_Gatherv(&(m->terrain[startIdx]),
-                rowsPerProc[rank] * m->ncols,
+                rowsPerProc[rank],
                 MPI_FLOAT, m->terrain,
                 rowsPerProc, displ,
                 MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-        /*
-    mnt *m_new = mnt_read(argv[1]);
-    MPI_Gatherv(&(m->terrain[startIdx]), rowsPerProc[rank] * m->ncols, MPI_FLOAT,
-                m_new,rowsPerProc, displ, MPI_FLOAT,
-                0, MPI_COMM_WORLD);
-    */
 
     print_debug(m, "3");
 
@@ -203,7 +201,7 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
         // SYNC COMPUTE
         mnt *expected;
-        expected = darboux(m);
+        expected = darboux_seq(m);
         mnt_compare(expected, d);
     }
 
