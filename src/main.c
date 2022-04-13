@@ -133,7 +133,7 @@ float *terrain;                     // linear array (size: ncols*nrows)
            rank, size, m->ncols,
            m->nrows, m->no_data, rowsPerProc[rank]);*/
 
-    m->nrows = (rowsPerProc[rank] / m->ncols);
+    m->nrows = (rowsPerProc[rank] / m->ncols) + 1;
 
     int startIdx = (rank == 0) ? 0 : m->ncols;
 
@@ -153,20 +153,20 @@ float *terrain;                     // linear array (size: ncols*nrows)
 
     }
 
-    print_debug(m, "1");
+    // print_debug(m, "1");
 
-    MPI_Scatterv(&(m->terrain[startIdx]), rowsPerProc, displ,
-                 MPI_FLOAT, m->terrain,
+    MPI_Scatterv(m->terrain, rowsPerProc, displ,
+                 MPI_FLOAT, &(m->terrain[startIdx]),
                  rowsPerProc[rank] * m->ncols,
                  MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    print_debug(m, "2");
+    // print_debug(m, "2");
 
-    printf("[%d] Before print_debug\n", rank);
+    // printf("[%d] Before print_debug\n", rank);
 
     print_debug(m, "3");
 
-    printf("[%d] Before darboux compute\n", rank);
+    // printf("[%d] Before darboux compute\n", rank);
 
     // COMPUTE
     d = darboux(m);

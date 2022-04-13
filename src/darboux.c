@@ -224,6 +224,8 @@ mnt *darboux(const mnt *restrict m)
         if (running)
         {
 
+            // printf("[%d] is running\n", rank);
+
             // 1 process = main process
             if (size == 1)
             {
@@ -242,7 +244,7 @@ mnt *darboux(const mnt *restrict m)
             if (rank == 0)
             {
 
-                //printf("[%d] is sending to [%d]\n", rank, rank + 1);
+                printf("[%d] is sending to [%d]\n", rank, rank + 1);
 
                 // On envoie Wprec au processus suivant
                 MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
@@ -261,7 +263,7 @@ mnt *darboux(const mnt *restrict m)
                     }
                 }
 
-                //printf("[%d] is receiving from [%d]\n", rank, rank + 1);
+                printf("[%d] is receiving from [%d]\n", rank, rank + 1);
 
                 MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
                          MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
@@ -277,14 +279,14 @@ mnt *darboux(const mnt *restrict m)
             else if (rank == size - 1)
             { // Dernier process
 
-                //printf("[%d] is sending to [%d]\n", rank, rank - 1);
+                printf("[%d] is sending to [%d]\n", rank, rank - 1);
 
                 // Envoie la première ligne du processus actuel au processus précédent
                 MPI_Send(&Wprec[1 * ncols], ncols,
                          MPI_FLOAT, rank - 1,
                          0, MPI_COMM_WORLD);
 
-                //printf("[%d] is receiving from [%d]\n", rank, rank - 1);
+                printf("[%d] is receiving from [%d]\n", rank, rank - 1);
 
                 // Attend de recevoir la ligne précédente du processus précédent
                 MPI_Recv(&Wprec[0], ncols,
@@ -306,21 +308,21 @@ mnt *darboux(const mnt *restrict m)
             else
             { // Tous les autres
 
-                //printf("[%d] is sending to [%d]\n", rank, rank - 1);
+                printf("[%d] is sending to [%d]\n", rank, rank - 1);
 
                 // Envoie la première ligne du processus actuel au processus précédent
                 MPI_Send(&Wprec[1 * ncols], ncols,
                          MPI_FLOAT, rank - 1,
                          0, MPI_COMM_WORLD);
 
-                //printf("[%d] is sending to [%d]\n", rank, rank + 1);
+                printf("[%d] is sending to [%d]\n", rank, rank + 1);
 
                 // Envoie la dernière ligne du processus actuel au processus suivant
                 MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
                          MPI_FLOAT, rank + 1,
                          0, MPI_COMM_WORLD);
 
-                //printf("[%d] is receiving from [%d]\n", rank, rank - 1);
+                printf("[%d] is receiving from [%d]\n", rank, rank - 1);
 
                 // Attend de recevoir la ligne précédente du processus précédent
                 MPI_Recv(&Wprec[0], ncols,
@@ -339,7 +341,7 @@ mnt *darboux(const mnt *restrict m)
                     }
                 }
 
-                //printf("[%d] is receiving from [%d]\n", rank, rank + 1);
+                printf("[%d] is receiving from [%d]\n", rank, rank + 1);
 
                 // Attend de recevoir la première ligne du processus suivant
                 MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
