@@ -120,12 +120,12 @@ void mnt_compare(mnt* expected, mnt* result)
             for(int j = 0 ; j < expected->ncols ; j++)
             {
                 const float exp = TERRAIN(expected,i,j);
-                const float res = TERRAIN(expected,i,j);
+                const float res = TERRAIN(result,i,j);
                 const float dif = exp-res;
                 if(dif != 0) {
                     fprintf(stderr, "BAD RESULTS !");
                     fprintf(stderr, " (result[%d][%d] = %g should be %g)\n",
-                            i, j, exp, res);
+                            i, j, res, exp);
                     return;
                 }
             }
