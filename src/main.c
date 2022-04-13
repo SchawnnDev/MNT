@@ -147,13 +147,13 @@ int main(int argc, char **argv)
                  MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     // Value after scatter
-    print_debug(m, "S");
+    // print_debug(m, "S");
 
     // COMPUTE
     d = darboux(m);
 
     // Value after darboux
-    print_debug(m, "D");
+    // print_debug(m, "D");
 
     MPI_Gatherv(&(d->terrain[startIdx]),
                 rowsPerProc[rank],
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
     if (rank == 0)
     {
         // Value after gather
-        print_debug(r, "R");
+        // print_debug(r, "R");
 
         FILE *out;
         if (argc == 3)
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
         // SYNC COMPUTE
         mnt *expected = darboux_seq( mnt_read(argv[1]));
         // Value expected
-        print_debug(expected, "E");
+        // print_debug(expected, "E");
         mnt_compare(expected, r);
     }
 

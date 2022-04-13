@@ -284,7 +284,7 @@ mnt *darboux(const mnt *restrict m)
                              MPI_STATUS_IGNORE);
 
                     // Ici on calcule jusqu'à l'avant derniere ligne
-                    for (int i = 1; i < nrows - 1; i++)
+                    for (int i = 1; i < nrows; i++)
                     {
                         for (int j = 0; j < ncols; j++)
                         {
