@@ -224,8 +224,8 @@ mnt *darboux(const mnt *restrict m)
             if (size == 1)
             {
                 int j;
-                bool p_modif;
-#pragma omp parallel for private(j, p_modif)
+
+#pragma omp parallel for private(j)
                 // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
                 for (int i = 0; i < nrows; i++)
                 {
@@ -233,7 +233,7 @@ mnt *darboux(const mnt *restrict m)
                     {
                         // calcule la nouvelle valeur de W[i,j]
                         // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                        p_modif = calcul_Wij(W, Wprec, m, i, j);
+                        bool p_modif = calcul_Wij(W, Wprec, m, i, j);
 
                         if (p_modif)
                         {
