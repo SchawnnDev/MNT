@@ -10,7 +10,7 @@
 
 // si ce define n'est pas commenté, l'exécution affiche sur stderr la hauteur
 // courante en train d'être calculée (doit augmenter) et l'itération du calcul
-#define DARBOUX_PPRINT
+//#define DARBOUX_PPRINT
 
 #define PRECISION_FLOTTANT 1.e-5
 
@@ -21,7 +21,6 @@
 float max_terrain(const mnt *restrict m)
 {
     float max = m->terrain[0];
-#pragma omp parallel for
     for (int i = 0; i < m->ncols * m->nrows; i++)
         if (m->terrain[i] > max)
             max = m->terrain[i];
@@ -37,8 +36,7 @@ float *init_W(const mnt *restrict m)
 
     // initialisation W
     int j;
-    const float max = max_terrain(m) + 10.;
-#pragma omp parallel for private(j)
+    const float max = max_terrain(m) + 10.f;
     for (int i = 0; i < nrows; i++)
     {
         for (j = 0; j < ncols; j++)
@@ -157,14 +155,14 @@ mnt *darboux_seq(const mnt *restrict m)
 
     // calcul : boucle principale
     int modif = 1;
-    while(modif)
+    while (modif)
     {
         modif = 0; // sera mis à 1 s'il y a une modification
 
         // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
-        for(int i=0; i<nrows; i++)
+        for (int i = 0; i < nrows; i++)
         {
-            for(int j=0; j<ncols; j++)
+            for (int j = 0; j < ncols; j++)
             {
                 // calcule la nouvelle valeur de W[i,j]
                 // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
@@ -189,10 +187,10 @@ mnt *darboux_seq(const mnt *restrict m)
     free(Wprec);
     // crée la structure résultat et la renvoie
     mnt *res;
-    CHECK((res=malloc(sizeof(*res))) != NULL);
+    CHECK((res = malloc(sizeof(*res))) != NULL);
     memcpy(res, m, sizeof(*res));
     res->terrain = W;
-    return(res);
+    return (res);
 }
 
 /*****************************************************************************/
@@ -212,11 +210,10 @@ mnt *darboux(const mnt *restrict m)
     bool modif = true, running = true;
     while (running)
     {
-
         // Va faire un || sur toutes les valeurs modif,
         // si toutes les valeurs sont 0 alors le programme est terminé
         MPI_Allreduce(&modif, &running, 1, MPI_C_BOOL,
-                   MPI_LOR, MPI_COMM_WORLD);
+                      MPI_LOR, MPI_COMM_WORLD);
         // Donc si running == 0, alors le programme sera terminé
 
         if (running)
@@ -226,18 +223,27 @@ mnt *darboux(const mnt *restrict m)
             // 1 process = main process
             if (size == 1)
             {
+                int j;
+                bool p_modif;
+#pragma omp parallel for private(j, p_modif)
                 // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
                 for (int i = 0; i < nrows; i++)
                 {
-                    for (int j = 0; j < ncols; j++)
+                    for (j = 0; j < ncols; j++)
                     {
                         // calcule la nouvelle valeur de W[i,j]
                         // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                        modif |= calcul_Wij(W, Wprec, m, i, j);
+                        p_modif = calcul_Wij(W, Wprec, m, i, j);
+
+                        if (p_modif)
+                        {
+#pragma omp atomic
+                            modif |= p_modif;
+                        }
+
                     }
                 }
-            }
-            else
+            } else
             {
                 // Host
                 if (rank == 0)
@@ -248,9 +254,15 @@ mnt *darboux(const mnt *restrict m)
                              MPI_FLOAT, rank + 1,
                              0, MPI_COMM_WORLD);
 
+
+                    MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
+                             MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
+                             MPI_STATUS_IGNORE);
+
+
                     // Ici on calcule jusqu'à l'avant derniere ligne
                     // Pour gagner du temps entre le send & le recv
-                    for (int i = 0; i < nrows - 2; i++)
+                    for (int i = 0; i < nrows - 1; i++)
                     {
                         for (int j = 0; j < ncols; j++)
                         {
@@ -260,28 +272,23 @@ mnt *darboux(const mnt *restrict m)
                         }
                     }
 
-                    MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
-                             MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
-                             MPI_STATUS_IGNORE);
-
                     // Ici on traite la derniere ligne
-                    for (int j = 0; j < ncols; ++j)
-                    {
-                        modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
-                    }
-                }
-                else if (rank == size - 1)
+                    /*           for (int j = 0; j < ncols; ++j)
+                               {
+                                   modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
+                               }*/
+                } else if (rank == size - 1)
                 { // Dernier process
-
-                    // Envoie la première ligne du processus actuel au processus précédent
-                    MPI_Send(&Wprec[1 * ncols], ncols,
-                             MPI_FLOAT, rank - 1,
-                             0, MPI_COMM_WORLD);
 
                     // Attend de recevoir la ligne précédente du processus précédent
                     MPI_Recv(&Wprec[0], ncols,
                              MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
                              MPI_STATUS_IGNORE);
+
+                    // Envoie la première ligne du processus actuel au processus précédent
+                    MPI_Send(&Wprec[1 * ncols], ncols,
+                             MPI_FLOAT, rank - 1,
+                             0, MPI_COMM_WORLD);
 
                     // Ici on calcule jusqu'à l'avant derniere ligne
                     for (int i = 1; i < nrows; i++)
@@ -294,14 +301,8 @@ mnt *darboux(const mnt *restrict m)
                         }
                     }
 
-                }
-                else
+                } else
                 { // Tous les autres
-
-                    // Envoie la première ligne du processus actuel au processus précédent
-                    MPI_Send(&Wprec[1 * ncols], ncols,
-                             MPI_FLOAT, rank - 1,
-                             0, MPI_COMM_WORLD);
 
                     // Envoie la dernière ligne du processus actuel au processus suivant
                     MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
@@ -313,9 +314,20 @@ mnt *darboux(const mnt *restrict m)
                              MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
                              MPI_STATUS_IGNORE);
 
+                    // Envoie la première ligne du processus actuel au processus précédent
+                    MPI_Send(&Wprec[ncols], ncols,
+                             MPI_FLOAT, rank - 1,
+                             0, MPI_COMM_WORLD);
+
+
+                    // Attend de recevoir la première ligne du processus suivant
+                    MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
+                             MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
+                             MPI_STATUS_IGNORE);
+
                     // Ici on calcule jusqu'à l'avant derniere ligne
                     // Pour gagner du temps entre le send & le recv
-                    for (int i = 1; i < nrows - 2; i++)
+                    for (int i = 1; i < nrows - 1; i++)
                     {
                         for (int j = 0; j < ncols; j++)
                         {
@@ -325,16 +337,11 @@ mnt *darboux(const mnt *restrict m)
                         }
                     }
 
-                    // Attend de recevoir la première ligne du processus suivant
-                    MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
-                             MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
-                             MPI_STATUS_IGNORE);
-
                     // Ici on traite la derniere ligne
-                    for (int j = 0; j < ncols; ++j)
+/*                    for (int j = 0; j < ncols; ++j)
                     {
                         modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
-                    }
+                    }*/
                 }
             }
 

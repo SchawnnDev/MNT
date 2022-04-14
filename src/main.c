@@ -93,7 +93,7 @@ int main(int argc, char **argv)
     // READ INPUT ONLY IN PROCESS 0
     if (rank == 0)
     {
-        printf("Size = %d\n", size);
+        printf("Starting with %d processes with %d threads.\n", size, omp_get_max_threads());
         m = mnt_read(argv[1]);
 
         CHECK((e = malloc(sizeof(*e))) != NULL);
