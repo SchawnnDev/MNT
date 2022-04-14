@@ -199,7 +199,7 @@ mnt *darboux_seq(const mnt *restrict m)
 // applique l'algorithme de Darboux sur le MNT m, pour calculer un nouveau MNT
 mnt *darboux(const mnt *restrict m)
 {
-    const int ncols = m->ncols, nrows = m->nrows;
+    int ncols = m->ncols, nrows = m->nrows;
 
     // initialisation
     float *restrict W, *restrict Wprec;
@@ -210,152 +210,84 @@ mnt *darboux(const mnt *restrict m)
     bool modif = true, running = true;
     while (running)
     {
-        // Va faire un || sur toutes les valeurs modif,
-        // si toutes les valeurs sont 0 alors le programme est terminé
-        MPI_Allreduce(&modif, &running, 1, MPI_C_BOOL,
-                      MPI_LOR, MPI_COMM_WORLD);
-        // Donc si running == 0, alors le programme sera terminé
+        modif = 0; // sera mis à 1 s'il y a une modification
 
-        if (running)
+        // 1 process = main process
+        if (size != 1)
         {
-            modif = 0; // sera mis à 1 s'il y a une modification
 
-            // 1 process = main process
-            if (size == 1)
+            if(rank != size -1)
             {
-                int j;
-
-#pragma omp parallel for private(j)
-                // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
-                for (int i = 0; i < nrows; i++)
-                {
-                    for (j = 0; j < ncols; j++)
-                    {
-                        // calcule la nouvelle valeur de W[i,j]
-                        // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                        bool p_modif = calcul_Wij(W, Wprec, m, i, j);
-
-                        if (p_modif)
-                        {
-#pragma omp atomic
-                            modif |= p_modif;
-                        }
-
-                    }
-                }
-            } else
-            {
-                // Host
-                if (rank == 0)
-                {
-
-                    // On envoie Wprec au processus suivant
-                    MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
-                             MPI_FLOAT, rank + 1,
-                             0, MPI_COMM_WORLD);
-
-
-                    MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
-                             MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
-                             MPI_STATUS_IGNORE);
-
-
-                    // Ici on calcule jusqu'à l'avant derniere ligne
-                    // Pour gagner du temps entre le send & le recv
-                    for (int i = 0; i < nrows - 1; i++)
-                    {
-                        for (int j = 0; j < ncols; j++)
-                        {
-                            // calcule la nouvelle valeur de W[i,j]
-                            // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                            modif |= calcul_Wij(W, Wprec, m, i, j);
-                        }
-                    }
-
-                    // Ici on traite la derniere ligne
-                    /*           for (int j = 0; j < ncols; ++j)
-                               {
-                                   modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
-                               }*/
-                } else if (rank == size - 1)
-                { // Dernier process
-
-                    // Attend de recevoir la ligne précédente du processus précédent
-                    MPI_Recv(&Wprec[0], ncols,
-                             MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
-                             MPI_STATUS_IGNORE);
-
-                    // Envoie la première ligne du processus actuel au processus précédent
-                    MPI_Send(&Wprec[1 * ncols], ncols,
-                             MPI_FLOAT, rank - 1,
-                             0, MPI_COMM_WORLD);
-
-                    // Ici on calcule jusqu'à l'avant derniere ligne
-                    for (int i = 1; i < nrows; i++)
-                    {
-                        for (int j = 0; j < ncols; j++)
-                        {
-                            // calcule la nouvelle valeur de W[i,j]
-                            // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                            modif |= calcul_Wij(W, Wprec, m, i, j);
-                        }
-                    }
-
-                } else
-                { // Tous les autres
-
-                    // Envoie la dernière ligne du processus actuel au processus suivant
-                    MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
-                             MPI_FLOAT, rank + 1,
-                             0, MPI_COMM_WORLD);
-
-                    // Attend de recevoir la ligne précédente du processus précédent
-                    MPI_Recv(&Wprec[0], ncols,
-                             MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
-                             MPI_STATUS_IGNORE);
-
-                    // Envoie la première ligne du processus actuel au processus précédent
-                    MPI_Send(&Wprec[ncols], ncols,
-                             MPI_FLOAT, rank - 1,
-                             0, MPI_COMM_WORLD);
-
-
-                    // Attend de recevoir la première ligne du processus suivant
-                    MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
-                             MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
-                             MPI_STATUS_IGNORE);
-
-                    // Ici on calcule jusqu'à l'avant derniere ligne
-                    // Pour gagner du temps entre le send & le recv
-                    for (int i = 1; i < nrows - 1; i++)
-                    {
-                        for (int j = 0; j < ncols; j++)
-                        {
-                            // calcule la nouvelle valeur de W[i,j]
-                            // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                            modif |= calcul_Wij(W, Wprec, m, i, j);
-                        }
-                    }
-
-                    // Ici on traite la derniere ligne
-/*                    for (int j = 0; j < ncols; ++j)
-                    {
-                        modif |= calcul_Wij(W, Wprec, m, nrows - 2, j);
-                    }*/
-                }
+                // On envoie Wprec au processus suivant
+                MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
+                         MPI_FLOAT, rank + 1,
+                         0, MPI_COMM_WORLD);
             }
 
+            if (rank != 0)
+            {
+                // Attend de recevoir la ligne précédente du processus précédent
+                MPI_Recv(&Wprec[0], ncols,
+                         MPI_FLOAT, rank - 1, 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+
+                // Envoie la première ligne du processus actuel au processus précédent
+                MPI_Send(&Wprec[ncols], ncols,
+                         MPI_FLOAT, rank - 1,
+                         0, MPI_COMM_WORLD);
+            }
+
+            if (rank != size -1) {
+                // Attend de recevoir la première ligne du processus suivant
+                MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
+                         MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+            }
         }
 
-#ifdef DARBOUX_PPRINT
-        dpprint();
-#endif
+        int j;
+        // Clang-tidy: openmp-use-default-none
+        // Using default(none) clause forces developers to explicitly specify
+        // data sharing attributes for the variables referenced in the construct,
+        // thus making it obvious which variables are referenced, and what is
+        // their data sharing attribute, thus increasing readability and
+        // possibly making errors easier to spot.
+        #pragma omp parallel for default(none) private(j) shared(nrows, ncols, W, Wprec, m, modif)
+        // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
+        for (int i = 0; i < nrows; i++)
+        {
+            for (j = 0; j < ncols; j++)
+            {
+                // calcule la nouvelle valeur de W[i,j]
+                // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
+                bool p_modif = calcul_Wij(W, Wprec, m, i, j);
+
+                // seulement modifier si modif == 1 pour eviter d'abuser sur omp atomic
+                if (p_modif)
+                {
+                    #pragma omp atomic
+                    modif |= p_modif;
+                }
+
+            }
+        }
+
+        #ifdef DARBOUX_PPRINT
+                dpprint();
+        #endif
 
         // échange W et Wprec
         // sans faire de copie mémoire : échange les pointeurs sur les deux tableaux
         float *tmp = W;
         W = Wprec;
         Wprec = tmp;
+
+        // Va faire un || sur toutes les valeurs modif,
+        // si toutes les valeurs sont 0 alors le programme est terminé
+        MPI_Allreduce(&modif, &running, 1, MPI_C_BOOL,
+                      MPI_LOR, MPI_COMM_WORLD);
+        // Donc si running == 0, alors le programme sera terminé
+
     }
     // fin du while principal
 
