@@ -1,3 +1,32 @@
+# Arguments
+
+threads ?= 1
+ifeq (0,$(filter 0,$(shell expr $(threads)\>=1) $(shell expr $(THR)\>=1)))
+   override threads = 1
+endif
+override THR = $(threads)
+THR_ARG = $(THR)
+
+processes ?= 1
+ifeq (0,$(filter 0,$(shell expr $(processes)\>=1) $(shell expr $(PRC)\>=1)))
+   override processes = 1
+endif
+override PRC = $(threads)
+PRC_ARG = $(PRC)
+
+input ?= none
+ifeq ($(input), none)
+else
+	IPT_ARG = $(input)
+endif
+
+output ?= none
+ifeq ($(output), none)
+else ifeq ($(output), console)
+else
+	OPT_ARG = $(output)
+endif
+
 # Directories
 
 SRC_DIR = src
@@ -25,6 +54,7 @@ EXECUTABLE = $(BIN_DIR)/./$(EXECUTABLE_NAME)
 CC = mpicc
 CFLAGS = -Wall -O3 -march=native -g -fopenmp
 # CFLAGS=-Wall -O1 -g -fopenmp
+EXE_FLAGS = -fopenmp
 
 # Files and folders
 
@@ -37,38 +67,77 @@ OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 $(BIN_DIR)/$(EXECUTABLE_NAME) : title tips build_dir $(OBJS)
 	@echo "\n> Compiling : "
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(OBJS) -fopenmp -o $@
+	$(CC) $(OBJS) $(EXE_FLAGS) -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+build_dir:
+	@$(call make-obj)
+
 # Run
+run: title tips
+ifdef ($(input))
+	@echo "> Input :" $(IPT_ARG)
+ifeq (0,$(filter $(output),none console))
+	@mkdir -p $(shell dirname $(OPT_ARG))
+	@echo "> Output :" $(OPT_ARG) "\n"
+endif
+	@ OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
+else
+	@echo "Usage: make run <input> [<output> <threads> <processes>]"
+endif
 
-run: title tips build_opt
-	@./bin/$(EXECUTABLE_NAME)
+mini: title tips
+ifeq ($(output), none)
+	$(eval OPT_ARG = $(OPT_DIR)/$(MIN_FL)$(FL_EXT))
+endif
+	$(eval IPT_ARG = $(IPT_DIR)/$(MIN_FL)$(FL_EXT))
+	@echo "> Input :" $(IPT_ARG)
+ifneq ($(output), console)
+	@mkdir -p $(shell dirname $(OPT_ARG))
+	@echo "> Output :" $(OPT_ARG) "\n"
+endif
+	@ OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
 
-mini: title tips build_opt
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(MIN_FL)$(FL_EXT) $(OPT_DIR)/$(MIN_FL)$(FL_EXT)
+small: title tips
+ifeq ($(output), none)
+	$(eval OPT_ARG = $(OPT_DIR)/$(SML_FL)$(FL_EXT))
+endif
+	$(eval IPT_ARG = $(IPT_DIR)/$(SML_FL)$(FL_EXT))
+	@echo "> Input :" $(IPT_ARG)
+ifneq ($(output), console)
+	@mkdir -p $(shell dirname $(OPT_ARG))
+	@echo "> Output :" $(OPT_ARG) "\n"
+endif
+	@ OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
 
-small: title tips build_opt
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(SML_FL)$(FL_EXT) $(OPT_DIR)/$(SML_FL)$(FL_EXT)
+medium: title tips
+ifeq ($(output), none)
+	$(eval OPT_ARG = $(OPT_DIR)/$(MED_FL)$(FL_EXT))
+endif
+	$(eval IPT_ARG = $(IPT_DIR)/$(MED_FL)$(FL_EXT))
+	@echo "> Input :" $(IPT_ARG)
+ifneq ($(output), console)
+	@mkdir -p $(shell dirname $(OPT_ARG))
+	@echo "> Output :" $(OPT_ARG) "\n"
+endif
+	@ OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
 
-medium: title tips build_opt
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(MED_FL)$(FL_EXT) $(OPT_DIR)/$(MED_FL)$(FL_EXT)
-
-large: title tips build_opt
-	@./bin/$(EXECUTABLE_NAME) $(IPT_DIR)/$(LRG_FL)$(FL_EXT) $(OPT_DIR)/$(LRG_FL)$(FL_EXT)
+large: title tips
+ifeq ($(output), none)
+	$(eval OPT_ARG = $(OPT_DIR)/$(LRG_FL)$(FL_EXT))
+endif
+	$(eval IPT_ARG = $(IPT_DIR)/$(LRG_FL)$(FL_EXT))
+	@echo "> Input :" $(IPT_ARG)
+ifneq ($(output), console)
+	@mkdir -p $(shell dirname $(OPT_ARG))
+	@echo "> Output :" $(OPT_ARG) "\n"
+endif
+	@ OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
 
 
 # Utils
-
-build_opt:
-	@echo "> Building the output directory :"
-	mkdir -p $(OPT_DIR)
-	@echo "> Output file is :"
-
-build_dir:
-	@$(call make-obj)
 
 clean:
 	@echo "> Cleaning :"
@@ -98,13 +167,24 @@ endef
 list:
 	@echo "> List of commands :"
 	@echo "make -> compiles the program"
-	@echo "make run -> runs the program"
-	@echo "make mini -> runs the program with the 'mini' input file"
-	@echo "make small -> runs the program with the 'small' input file"
-	@echo "make medium -> runs the program with the 'medium' input file"
-	@echo "make large -> runs the program with the 'large' input file"
+	@echo "make args -> show the arguments available when running"
 	@echo "make clean -> clears the directory"
 	@echo "make dist -> creates an archive"
+	@echo "make run -> runs the program \n\t Usage: make run <input> [<output> <threads> <processes>]"
+	@echo "make mini -> runs the program with the 'mini' input file \n\t Usage: make mini [<input> <output> <threads> <processes>]"
+	@echo "make small -> runs the program with the 'small' input file \n\t Usage: make small [<input> <output> <threads> <processes>]"
+	@echo "make medium -> runs the program with the 'medium' input file \n\t Usage: make medium [<input> <output> <threads> <processes>]"
+	@echo "make large -> runs the program with the 'large' input file \n\t Usage: make large [<input> <output> <threads> <processes>]"
+
+args:
+	@echo "/!\ Only available for : <make run>, <make mini>, <make small>, <make medium> and <make large> /!\ "
+	@echo "> List of arguments :"
+	@echo "threads -> number of threads when running with OpenMP, default = 1"
+	@echo "processes -> number of processes when running with MPI, default = 1"
+	@echo "input -> custom path to the input file, has a default path is set, required for <make run>"
+	@echo "output -> custom path for the output file, has a default path is set, \n\t\t output=console to display in the terminal"
+	@echo "Example : make run input=input/mini.mnt output=console threads=2 processes=2"
+
 
 title:
 	@echo ' ______ ______   ________   _________'
