@@ -8,9 +8,9 @@ on:
 
 jobs:
   build:
-    container: mfisherman/openmpi
     runs-on: ubuntu-latest
-
     steps:
-      - name: make
-        run: make
+    - name: checkout repo
+      uses: actions/checkout@v2
+    - name: build application
+      run: make build
