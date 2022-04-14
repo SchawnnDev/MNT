@@ -153,17 +153,11 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(m->terrain, rowsPerProc, displ,
                  MPI_FLOAT, &(m->terrain[startIdx]),
-                 rowsPerProc[rank] * m->ncols,
+                 rowsPerProc[rank],
                  MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-    // Value after scatter
-    // print_debug(m, "S");
 
     // COMPUTE
     d = darboux(m);
-
-    // Value after darboux
-    // print_debug(m, "D");
 
     MPI_Gatherv(&(d->terrain[startIdx]),
                 rowsPerProc[rank],

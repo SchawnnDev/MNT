@@ -30,13 +30,14 @@ float max_terrain(const mnt *restrict m)
 // initialise le tableau W de départ à partir d'un mnt m
 float *init_W(const mnt *restrict m)
 {
-    const int ncols = m->ncols, nrows = m->nrows;
+    int ncols = m->ncols, nrows = m->nrows;
     float *restrict W;
     CHECK((W = malloc(ncols * nrows * sizeof(float))) != NULL);
 
     // initialisation W
     int j;
-    const float max = max_terrain(m) + 10.f;
+    float max = max_terrain(m) + 10.f;
+#pragma omp parallel for default(none) private(j) shared(nrows, ncols, m, W, max)
     for (int i = 0; i < nrows; i++)
     {
         for (j = 0; j < ncols; j++)
@@ -208,6 +209,11 @@ mnt *darboux(const mnt *restrict m)
 
     // calcul : boucle principale
     bool modif = true, running = true;
+    int j;
+    // set start and end indexes for nrows loop
+    int j_start = size != 1 && rank != 0;
+    int j_end = nrows - (size != 1 && rank != size - 1);
+
     while (running)
     {
         modif = 0; // sera mis à 1 s'il y a une modification
@@ -216,7 +222,7 @@ mnt *darboux(const mnt *restrict m)
         if (size != 1)
         {
 
-            if(rank != size -1)
+            if (rank != size - 1)
             {
                 // On envoie Wprec au processus suivant
                 MPI_Send(&Wprec[(nrows - 2) * ncols], ncols,
@@ -237,24 +243,25 @@ mnt *darboux(const mnt *restrict m)
                          0, MPI_COMM_WORLD);
             }
 
-            if (rank != size -1) {
+            if (rank != size - 1)
+            {
                 // Attend de recevoir la première ligne du processus suivant
                 MPI_Recv(&Wprec[(nrows - 1) * ncols], ncols,
                          MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD,
                          MPI_STATUS_IGNORE);
             }
+
         }
 
-        int j;
         // Clang-tidy: openmp-use-default-none
         // Using default(none) clause forces developers to explicitly specify
         // data sharing attributes for the variables referenced in the construct,
         // thus making it obvious which variables are referenced, and what is
         // their data sharing attribute, thus increasing readability and
         // possibly making errors easier to spot.
-        #pragma omp parallel for default(none) private(j) shared(nrows, ncols, W, Wprec, m, modif)
+#pragma omp parallel for default(none) private(j) shared(nrows,rank, j_start, j_end, ncols, W, Wprec, m, modif)
         // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
-        for (int i = 0; i < nrows; i++)
+        for (int i = j_start; i < j_end; i++)
         {
             for (j = 0; j < ncols; j++)
             {
@@ -265,16 +272,16 @@ mnt *darboux(const mnt *restrict m)
                 // seulement modifier si modif == 1 pour eviter d'abuser sur omp atomic
                 if (p_modif)
                 {
-                    #pragma omp atomic
+#pragma omp atomic
                     modif |= p_modif;
                 }
 
             }
         }
 
-        #ifdef DARBOUX_PPRINT
-                dpprint();
-        #endif
+#ifdef DARBOUX_PPRINT
+        dpprint();
+#endif
 
         // échange W et Wprec
         // sans faire de copie mémoire : échange les pointeurs sur les deux tableaux
