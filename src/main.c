@@ -63,7 +63,7 @@ void calculate_counts(mnt *m, int *rowsPerProc, int *displ)
 
 int main(int argc, char **argv)
 {
-    mnt *m, *d, *r, *e;
+    mnt *m, *d, *r, *e = NULL;
     double time_reference, time_kernel = 0, speedup, efficiency;
 
     if (argc < 2)

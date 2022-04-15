@@ -11,7 +11,7 @@ mnt *mnt_read(char *fname)
   mnt *m;
   FILE *f;
 
-  fprintf(stdout, "%s\n", fname);
+  // fprintf(stdout, "%s\n", fname);
 
   CHECK((m = malloc(sizeof(*m))) != NULL);
   CHECK((f = fopen(fname, "r")) != NULL);
