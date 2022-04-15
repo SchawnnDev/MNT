@@ -259,7 +259,7 @@ mnt *darboux(const mnt *restrict m)
         // thus making it obvious which variables are referenced, and what is
         // their data sharing attribute, thus increasing readability and
         // possibly making errors easier to spot.
-#pragma omp parallel for default(none) private(j) shared(nrows,rank, j_start, j_end, ncols, W, Wprec, m, modif)
+#pragma omp parallel for reduction(|:modif) default(none) private(j) shared(nrows,rank, j_start, j_end, ncols, W, Wprec, m)
         // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
         for (int i = j_start; i < j_end; i++)
         {
@@ -267,15 +267,7 @@ mnt *darboux(const mnt *restrict m)
             {
                 // calcule la nouvelle valeur de W[i,j]
                 // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                bool p_modif = calcul_Wij(W, Wprec, m, i, j);
-
-                // seulement modifier si modif == 1 pour eviter d'abuser sur omp atomic
-                if (p_modif)
-                {
-#pragma omp atomic
-                    modif |= p_modif;
-                }
-
+               modif |= calcul_Wij(W, Wprec, m, i, j);
             }
         }
 
