@@ -37,14 +37,18 @@ void print_debug(mnt *m, char* prout)
 
 void calculate_counts(mnt *m, int *rowsPerProc, int *displ)
 {
+    #pragma omp parallel for
     for (size_t i = 0; i < size; i++)
         rowsPerProc[i] = m->nrows / size;
 
     // Check if there is more processes than mat rows
     // TODO : check if a process had 0 as nrows value
     if (size > m->nrows)
+    {
+        #pragma omp parallel for
         for (size_t i = size - m->nrows; i < size; i++)
             rowsPerProc[i] = 0;
+    }
 
     // Distribute the remaining rows to the first processes in line
     int remainingRows = m->nrows % size;
@@ -78,19 +82,6 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    const int mnt_var_count = 3;
-    int blocklengths[] = {1, 1, 1};
-    MPI_Datatype mnt_datatypes[] = {MPI_INT, MPI_INT, MPI_FLOAT};
-    MPI_Datatype mpi_mnt_type;
-    MPI_Aint offsets[mnt_var_count];
-    offsets[0] = offsetof(mnt, ncols);
-    offsets[1] = offsetof(mnt, nrows);
-    offsets[2] = offsetof(mnt, no_data);
-
-    MPI_Type_create_struct(mnt_var_count, blocklengths, offsets,
-                           mnt_datatypes, &mpi_mnt_type);
-    MPI_Type_commit(&mpi_mnt_type);
-
     // READ INPUT ONLY IN PROCESS 0
     if (rank == 0)
     {
@@ -100,7 +91,7 @@ int main(int argc, char **argv)
         CHECK((e = malloc(sizeof(*e))) != NULL);
         memcpy(e, m, sizeof(*e));
 
-        time_kernel = omp_get_wtime() ;
+        time_kernel = omp_get_wtime();
     }
     else
     {
@@ -112,7 +103,19 @@ int main(int argc, char **argv)
         m->no_data = 0;
     }
 
+    const int mnt_var_count = 3;
+    int blocklengths[] = {1, 1, 1};
+    MPI_Datatype mnt_datatypes[] = {MPI_INT, MPI_INT, MPI_FLOAT};
+    MPI_Datatype mpi_mnt_type;
+    MPI_Aint offsets[mnt_var_count];
+    offsets[0] = offsetof(mnt, ncols);
+    offsets[1] = offsetof(mnt, nrows);
+    offsets[2] = offsetof(mnt, no_data);
+
     // Broadcast m to each process
+    MPI_Type_create_struct(mnt_var_count, blocklengths, offsets,
+                           mnt_datatypes, &mpi_mnt_type);
+    MPI_Type_commit(&mpi_mnt_type);
     MPI_Bcast(m, 1, mpi_mnt_type, 0, MPI_COMM_WORLD);
 
     // Set result mnt
@@ -147,6 +150,7 @@ int main(int argc, char **argv)
               NULL);
 
         // Init table terrain with 0
+        #pragma omp parallel for collapse(2)
         for (int i = 0; i < m->nrows; ++i)
             for (int j = 0; j < m->ncols; ++j)
                 TERRAIN(m, i, j) = 0;
