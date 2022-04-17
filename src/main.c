@@ -8,6 +8,7 @@
 #include "type.h"
 #include "io.h"
 #include "darboux.h"
+#include "darboux_seq.h"
 #include "check.h"
 
 #define HYPERTHREADING 1 // 1 if hyperthreading is on, 0 otherwise

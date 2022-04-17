@@ -8,7 +8,6 @@
 // Acceder aux variables du main.c
 extern int rank, size;
 
-mnt *darboux_seq(const mnt *restrict m);
 mnt *darboux(const mnt *restrict m);
 
 #endif

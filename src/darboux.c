@@ -144,56 +144,6 @@ int calcul_Wij(float *restrict W, const float *restrict Wprec, const mnt *m,
     return (modif);
 }
 
-// applique l'algorithme de Darboux sur le MNT m, pour calculer un nouveau MNT
-mnt *darboux_seq(const mnt *restrict m)
-{
-    const int ncols = m->ncols, nrows = m->nrows;
-
-    // initialisation
-    float *restrict W, *restrict Wprec;
-    CHECK((W = malloc(ncols * nrows * sizeof(float))) != NULL);
-    Wprec = init_W(m);
-
-    // calcul : boucle principale
-    int modif = 1;
-    while (modif)
-    {
-        modif = 0; // sera mis à 1 s'il y a une modification
-
-        // calcule le nouveau W fonction de l'ancien (Wprec) en chaque point [i,j]
-        for (int i = 0; i < nrows; i++)
-        {
-            for (int j = 0; j < ncols; j++)
-            {
-                // calcule la nouvelle valeur de W[i,j]
-                // en utilisant les 8 voisins de la position [i,j] du tableau Wprec
-                modif |= calcul_Wij(W, Wprec, m, i, j);
-            }
-        }
-
-#ifdef DARBOUX_PPRINT
-        dpprint();
-#endif
-
-        // échange W et Wprec
-        // sans faire de copie mémoire : échange les pointeurs sur les deux tableaux
-        float *tmp = W;
-        W = Wprec;
-        Wprec = tmp;
-    }
-    // fin du while principal
-
-
-    // fin du calcul, le résultat se trouve dans W
-    free(Wprec);
-    // crée la structure résultat et la renvoie
-    mnt *res;
-    CHECK((res = malloc(sizeof(*res))) != NULL);
-    memcpy(res, m, sizeof(*res));
-    res->terrain = W;
-    return (res);
-}
-
 /*****************************************************************************/
 /*           Fonction de calcul principale - À PARALLÉLISER                  */
 /*****************************************************************************/
