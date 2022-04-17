@@ -11,7 +11,7 @@ processes ?= 1
 ifeq (0,$(filter 0,$(shell expr $(processes)\>=1) $(shell expr $(PRC)\>=1)))
    override processes = 1
 endif
-override PRC = $(threads)
+override PRC = $(processes)
 PRC_ARG = $(PRC)
 
 input ?= none
@@ -134,7 +134,7 @@ ifneq ($(output), console)
 	@mkdir -p $(shell dirname $(OPT_ARG))
 	@echo "> Output :" $(OPT_ARG) "\n"
 endif
-	@ OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
+	OMP_NUM_THREADS=$(THR_ARG) mpirun -n $(PRC_ARG) ./bin/$(EXECUTABLE_NAME) $(IPT_ARG) $(OPT_ARG)
 
 
 # Utils
