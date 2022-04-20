@@ -35,17 +35,15 @@ void print_debug(mnt *m, char* prout)
     }
 }
 
+// inutile de paralleliser ici car trop peu utile
 void calculate_counts(mnt *m, int *rowsPerProc, int *displ)
 {
-    #pragma omp parallel for
     for (size_t i = 0; i < size; i++)
         rowsPerProc[i] = m->nrows / size;
 
     // Check if there is more processes than mat rows
-    // TODO : check if a process had 0 as nrows value
     if (size > m->nrows)
     {
-        #pragma omp parallel for
         for (size_t i = size - m->nrows; i < size; i++)
             rowsPerProc[i] = 0;
     }

@@ -21,9 +21,9 @@
 float max_terrain(const mnt *restrict m)
 {
     float max = m->terrain[0];
+    #pragma omp parallel for reduction(max: max)
     for (int i = 0; i < m->ncols * m->nrows; i++)
-        if (m->terrain[i] > max)
-            max = m->terrain[i];
+        max = m->terrain[i] > max ? m->terrain[i] : max;
     return (max);
 }
 
