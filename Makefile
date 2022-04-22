@@ -34,6 +34,7 @@ OBJ_DIR = obj
 BIN_DIR = bin
 OPT_DIR = output
 IPT_DIR = input
+IMG_DIR = images
 ARCH_DIR = dist
 
 # Files
@@ -149,7 +150,7 @@ clean:
 dist: clean
 	@mkdir -p $(ARCH_DIR)
 	@echo "> Archiving :"
-	tar -czvf $(ARCH_DIR)/MNT-Projet_PP.tar.gz Makefile README.md $(SRC_DIR)
+	tar -czvf $(ARCH_DIR)/MNT-Projet_PP.tar.gz Makefile README.md report.pdf $(SRC_DIR) $(IMG_DIR)
 
 # Functions
 
