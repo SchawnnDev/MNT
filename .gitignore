@@ -66,6 +66,9 @@ img/
 # tests rep
 tests/
 
+# archive rep
+dist/
+
 # CMake
 cmake-build-debug/
 
